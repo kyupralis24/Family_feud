@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Family Feud — Host Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Rubik:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy-dark:#060b35;
+    --navy:#101e6e;
+    --navy-light:#2840b5;
+    --gold:#ffcc33;
+    --gold-light:#ffe486;
+    --cream:#f7f1de;
+    --red:#e8203c;
+    --red-dark:#9c0f1c;
+    --white:#ffffff;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;min-height:100vh;
+    background:radial-gradient(ellipse at top, var(--navy-light), var(--navy-dark) 75%);
+    color:var(--white);font-family:'Rubik',sans-serif;
+    overflow-x:hidden;
+  }
+  .stage{max-width:1200px;margin:0 auto;padding:18px 20px 28px;min-height:100vh;display:flex;flex-direction:column;}
+
+  /* ---------- Top bar ---------- */
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+  .round-label{font-family:'Anton',sans-serif;letter-spacing:1px;color:var(--gold-light);font-size:1.05rem;}
+
+  /* ---------- Question banner ---------- */
+  .question-banner{
+    background:linear-gradient(180deg,var(--navy-light),var(--navy));
+    border:3px solid var(--gold);border-radius:14px;
+    padding:18px 24px;text-align:center;
+    font-family:'Anton',sans-serif;font-size:clamp(1.2rem,2.6vw,1.9rem);
+    letter-spacing:.5px;text-transform:uppercase;
+    box-shadow:0 6px 20px rgba(0,0,0,.4);margin-bottom:16px;
+  }
+
+  /* ---------- Board ---------- */
+  .board-wrap{position:relative;flex:1;display:flex;align-items:center;justify-content:center;padding:18px 0;min-height:340px;}
+  .sunburst{
+    position:absolute;width:140%;height:140%;
+    background:repeating-conic-gradient(var(--gold-light) 0deg 4deg, transparent 4deg 16deg);
+    opacity:.13;border-radius:50%;animation:spin 100s linear infinite;z-index:0;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+  @media (prefers-reduced-motion: reduce){ .sunburst{animation:none;} }
+
+  .tile-grid{
+    position:relative;z-index:1;display:grid;
+    grid-template-rows:repeat(4,1fr);grid-auto-flow:column;
+    gap:14px;width:100%;max-width:760px;
+  }
+  .tile{position:relative;height:80px;perspective:900px;cursor:pointer;}
+  .tile-inner{position:absolute;inset:0;transform-style:preserve-3d;transition:transform .5s cubic-bezier(.4,.2,.2,1);border-radius:10px;}
+  .tile.revealed .tile-inner{transform:rotateY(180deg);}
+  .tile.locked{cursor:default;}
+  .tile-face{position:absolute;inset:0;border-radius:10px;display:flex;align-items:center;backface-visibility:hidden;box-shadow:0 4px 10px rgba(0,0,0,.35);}
+  .tile-front{background:linear-gradient(160deg,var(--navy-light),var(--navy));border:2px solid var(--gold);justify-content:flex-start;}
+  .tile-num{
+    width:44px;height:44px;border-radius:50%;background:var(--gold);color:var(--navy-dark);
+    font-family:'Anton',sans-serif;font-size:1.3rem;display:flex;align-items:center;justify-content:center;
+    margin-left:14px;box-shadow:inset 0 -3px 6px rgba(0,0,0,.25);
+  }
+  .tile-back{background:var(--cream);color:var(--navy-dark);transform:rotateY(180deg);justify-content:space-between;padding:0 16px;}
+  .tile-answer-text{font-family:'Anton',sans-serif;font-size:1rem;text-transform:uppercase;letter-spacing:.3px;padding-right:8px;}
+  .tile-points{background:var(--red-dark);color:var(--white);font-family:'Anton',sans-serif;padding:4px 12px;border-radius:6px;font-size:1.05rem;white-space:nowrap;}
+
+  /* ---------- Status bar (strikes / pot / steal) ---------- */
+  .status-bar{display:flex;align-items:center;justify-content:center;gap:26px;margin:8px 0 18px;flex-wrap:wrap;}
+  .strikes{display:flex;gap:10px;}
+  .strike-box{
+    width:42px;height:42px;border:2px solid var(--gold);border-radius:8px;
+    display:flex;align-items:center;justify-content:center;font-family:'Anton',sans-serif;font-size:1.5rem;
+    color:transparent;background:rgba(255,255,255,.05);
+  }
+  .strike-box.active{color:var(--white);background:var(--red);animation:pop .3s ease;}
+  @keyframes pop{0%{transform:scale(.4);}60%{transform:scale(1.15);}100%{transform:scale(1);}}
+  .pot{font-family:'Anton',sans-serif;color:var(--gold-light);font-size:1.05rem;}
+  .steal-banner{background:var(--red);color:white;font-family:'Anton',sans-serif;padding:6px 16px;border-radius:20px;letter-spacing:1px;animation:pulse 1.2s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.55;}}
+
+  /* ---------- Teams bar ---------- */
+  .teams-bar{display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:stretch;}
+  .team-panel{border:2px solid var(--gold);border-radius:12px;padding:14px;text-align:center;background:linear-gradient(180deg,rgba(255,255,255,.05),transparent);transition:box-shadow .3s, border-color .3s;}
+  .team-panel.active{border-color:var(--gold-light);box-shadow:0 0 18px rgba(255,204,51,.55);}
+  .team-name{background:transparent;border:none;color:var(--gold-light);font-family:'Anton',sans-serif;font-size:1.15rem;text-align:center;width:100%;text-transform:uppercase;letter-spacing:.5px;}
+  .team-name:focus{outline:1px dashed var(--gold);}
+  .team-score{font-family:'Anton',sans-serif;font-size:2.3rem;color:white;margin:2px 0;}
+  .team-sub{font-size:.78rem;color:rgba(255,255,255,.7);}
+
+  .controls-center{display:flex;flex-direction:column;gap:8px;justify-content:center;min-width:170px;}
+  button{font-family:'Rubik',sans-serif;font-weight:600;border-radius:8px;padding:10px 14px;border:none;cursor:pointer;font-size:.82rem;}
+  .primary-btn{background:var(--navy-light);color:white;border:1px solid var(--gold);}
+  .danger-btn{background:var(--red);color:white;}
+  .gold-btn{background:var(--gold);color:var(--navy-dark);}
+  .ghost-btn{background:transparent;color:var(--gold-light);border:1px solid var(--gold-light);}
+  button:hover{filter:brightness(1.12);}
+  button:disabled{opacity:.4;cursor:not-allowed;filter:none;}
+  button:focus-visible{outline:3px solid var(--gold-light);outline-offset:2px;}
+
+  /* ---------- Round-over overlay ---------- */
+  .round-over-overlay{position:fixed;inset:0;background:rgba(6,11,53,.93);display:flex;align-items:center;justify-content:center;z-index:50;}
+  .round-over-card{text-align:center;animation:rise .4s ease;padding:20px;}
+  @keyframes rise{from{transform:translateY(20px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+  #roundOverText{font-family:'Anton',sans-serif;font-size:clamp(1.6rem,4vw,2.4rem);color:var(--gold-light);margin-bottom:22px;text-transform:uppercase;}
+
+  /* ---------- Scoreboard view ---------- */
+  .scoreboard-view{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:34px;}
+  .scoreboard-title{font-family:'Anton',sans-serif;font-size:1.4rem;color:var(--gold-light);letter-spacing:2px;text-transform:uppercase;}
+  .scoreboard-teams{display:flex;gap:40px;flex-wrap:wrap;justify-content:center;}
+  .scoreboard-team{text-align:center;border:3px solid var(--gold);border-radius:16px;padding:30px 50px;}
+  .scoreboard-team .name{font-family:'Anton',sans-serif;font-size:1.4rem;color:var(--gold-light);text-transform:uppercase;}
+  .scoreboard-team .score{font-family:'Anton',sans-serif;font-size:3.8rem;}
+  .scoreboard-actions{display:flex;gap:12px;}
+
+  [hidden]{display:none !important;}
+
+  @media (max-width:760px){
+    .teams-bar{grid-template-columns:1fr;}
+    .controls-center{order:-1;flex-direction:row;flex-wrap:wrap;justify-content:center;}
+    .tile{height:64px;}
+  }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+
+  <div class="topbar">
+    <div class="round-label" id="roundLabel">Round 1 of 5</div>
+    <button class="ghost-btn" id="viewToggleBtn">Scoreboard ▸ (S)</button>
+  </div>
+
+  <!-- ===== BOARD VIEW ===== -->
+  <section id="boardView">
+    <div class="question-banner" id="questionText"></div>
+
+    <div class="board-wrap">
+      <div class="sunburst" aria-hidden="true"></div>
+      <div class="tile-grid" id="tileGrid"></div>
+    </div>
+
+    <div class="status-bar">
+      <div class="strikes" id="strikesDisplay">
+        <span class="strike-box"></span>
+        <span class="strike-box"></span>
+        <span class="strike-box"></span>
+      </div>
+      <div class="pot" id="potDisplay">Round points: 0</div>
+      <div class="steal-banner" id="stealBanner" hidden></div>
+    </div>
+
+    <div class="teams-bar">
+      <div class="team-panel" id="teamPanelA">
+        <input class="team-name" id="teamNameA" value="Team A" maxlength="18">
+        <div class="team-score" id="teamScoreA">0</div>
+        <div class="team-sub">Strikes this round: <span id="teamStrikesA">0</span>/3</div>
+      </div>
+
+      <div class="controls-center">
+        <button class="primary-btn" id="switchTeamBtn">⇄ Switch team (←/→)</button>
+        <button class="danger-btn" id="strikeBtn">✕ Strike (X)</button>
+        <button class="gold-btn" id="nextRoundBtn">Next round ▸ (N)</button>
+        <button class="ghost-btn" id="undoBtn">Undo (Z)</button>
+      </div>
+
+      <div class="team-panel" id="teamPanelB">
+        <input class="team-name" id="teamNameB" value="Team B" maxlength="18">
+        <div class="team-score" id="teamScoreB">0</div>
+        <div class="team-sub">Strikes this round: <span id="teamStrikesB">0</span>/3</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SCOREBOARD VIEW ===== -->
+  <section class="scoreboard-view" id="scoreboardView" hidden>
+    <div class="scoreboard-title" id="scoreboardTitle">Scoreboard</div>
+    <div class="scoreboard-teams">
+      <div class="scoreboard-team">
+        <div class="name" id="sbNameA">Team A</div>
+        <div class="score" id="sbScoreA">0</div>
+      </div>
+      <div class="scoreboard-team">
+        <div class="name" id="sbNameB">Team B</div>
+        <div class="score" id="sbScoreB">0</div>
+      </div>
+    </div>
+    <div class="scoreboard-actions">
+      <button class="gold-btn" id="backToBoardBtn">‹ Back to game (S)</button>
+      <button class="ghost-btn" id="resetGameBtn">Reset entire game</button>
+    </div>
+  </section>
+
+  <!-- ===== ROUND OVER OVERLAY ===== -->
+  <div class="round-over-overlay" id="roundOverOverlay" hidden>
+    <div class="round-over-card">
+      <div id="roundOverText"></div>
+      <button class="gold-btn" id="overlayNextBtn">Next round ▸</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* =========================================================
+   EDIT THIS LIST BEFORE THE GAME
+   Each round needs exactly 8 answers, ordered by points (desc is traditional but not required).
+   ========================================================= */
+const rounds = [
+  {
+    question: "Name something you bring to a picnic",
+    answers: [
+      {text:"Sandwiches", points:28},
+      {text:"Blanket", points:24},
+      {text:"Drinks", points:18},
+      {text:"Fruit", points:12},
+      {text:"Sunscreen", points:8},
+      {text:"Frisbee", points:6},
+      {text:"Napkins", points:3},
+      {text:"Bug spray", points:1},
+    ]
+  },
+  {
+    question: "Name a reason someone shows up late to work",
+    answers: [
+      {text:"Traffic", points:32},
+      {text:"Overslept", points:26},
+      {text:"Lost keys / phone", points:14},
+      {text:"Family emergency", points:12},
+      {text:"Forgot something at home", points:9},
+      {text:"Bad weather", points:4},
+      {text:"Long line at coffee shop", points:2},
+      {text:"Car wouldn't start", points:1},
+    ]
+  },
+  {
+    question: "Name something people do to relax after a long day",
+    answers: [
+      {text:"Watch TV", points:30},
+      {text:"Take a nap", points:22},
+      {text:"Listen to music", points:16},
+      {text:"Take a bath", points:12},
+      {text:"Read a book", points:10},
+      {text:"Exercise", points:6},
+      {text:"Call a friend", points:3},
+      {text:"Cook a meal", points:1},
+    ]
+  },
+  {
+    question: "Name a job where you have to wear a uniform",
+    answers: [
+      {text:"Police officer", points:26},
+      {text:"Nurse", points:22},
+      {text:"Soldier", points:18},
+      {text:"Chef", points:12},
+      {text:"Firefighter", points:10},
+      {text:"Pilot", points:7},
+      {text:"Mail carrier", points:3},
+      {text:"Security guard", points:2},
+    ]
+  },
+  {
+    question: "Name something you check before leaving the house",
+    answers: [
+      {text:"Phone", points:30},
+      {text:"Keys", points:24},
+      {text:"Wallet", points:18},
+      {text:"Stove / oven off", points:12},
+      {text:"Lights off", points:8},
+      {text:"Door locked", points:5},
+      {text:"Weather", points:2},
+      {text:"Mirror / appearance", points:1},
+    ]
+  },
+];
+
+/* ========================= STATE ========================= */
+let state = {
+  roundIndex: 0,
+  revealed: [false,false,false,false,false,false,false,false],
+  pot: 0,
+  activeTeam: 'A',
+  stealMode: false,
+  roundOver: false,
+  winningTeam: null,
+  view: 'board',
+  teams: {
+    A: { name: 'Team A', score: 0, strikes: 0 },
+    B: { name: 'Team B', score: 0, strikes: 0 }
+  }
+};
+let history = [];
+
+function snapshot(){
+  history.push(JSON.parse(JSON.stringify(state)));
+  if (history.length > 25) history.shift();
+}
+function undo(){
+  if (!history.length) return;
+  state = history.pop();
+  render();
+}
+
+/* ========================= AUDIO ========================= */
+let audioCtx = null;
+function ctx(){
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+function tone(freq, duration, type, startGain, endGain, delay=0){
+  const c = ctx();
+  const osc = c.createOscillator();
+  const gain = c.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(startGain, c.currentTime + delay);
+  gain.gain.exponentialRampToValueAtTime(Math.max(endGain,0.0001), c.currentTime + delay + duration);
+  osc.connect(gain).connect(c.destination);
+  osc.start(c.currentTime + delay);
+  osc.stop(c.currentTime + delay + duration);
+}
+function playSound(kind){
+  try{
+    if (kind === 'ding'){
+      tone(880, .12, 'triangle', .2, .001);
+      tone(1320, .15, 'triangle', .15, .001, .08);
+    } else if (kind === 'buzz'){
+      tone(140, .35, 'sawtooth', .25, .001);
+    } else if (kind === 'win'){
+      tone(523, .15, 'square', .18, .001, 0);
+      tone(659, .15, 'square', .18, .001, .14);
+      tone(784, .25, 'square', .2, .001, .28);
+    }
+  } catch(e){ /* audio not available, ignore */ }
+}
+
+/* ========================= GAME LOGIC ========================= */
+function currentRound(){ return rounds[state.roundIndex]; }
+function gameOver(){ return state.roundIndex >= rounds.length; }
+
+function revealTile(i){
+  if (gameOver() || state.roundOver) return;
+  if (state.revealed[i]) return;
+  snapshot();
+  const answer = currentRound().answers[i];
+  state.revealed[i] = true;
+  state.pot += answer.points;
+  playSound('ding');
+
+  if (state.stealMode){
+    endRound(state.activeTeam);
+  } else if (state.revealed.every(r => r)){
+    endRound(state.activeTeam);
+  }
+  render();
+}
+
+function strike(){
+  if (gameOver() || state.roundOver) return;
+  snapshot();
+  if (state.stealMode){
+    playSound('buzz');
+    const other = state.activeTeam === 'A' ? 'B' : 'A';
+    endRound(other);
+  } else {
+    state.teams[state.activeTeam].strikes++;
+    playSound('buzz');
+    if (state.teams[state.activeTeam].strikes >= 3){
+      state.stealMode = true;
+      state.activeTeam = state.activeTeam === 'A' ? 'B' : 'A';
+    }
+  }
+  render();
+}
+
+function endRound(teamKey){
+  state.teams[teamKey].score += state.pot;
+  state.roundOver = true;
+  state.winningTeam = teamKey;
+  playSound('win');
+}
+
+function nextRound(){
+  if (gameOver()) return;
+  snapshot();
+  state.roundIndex++;
+  state.revealed = [false,false,false,false,false,false,false,false];
+  state.pot = 0;
+  state.stealMode = false;
+  state.roundOver = false;
+  state.winningTeam = null;
+  state.teams.A.strikes = 0;
+  state.teams.B.strikes = 0;
+  render();
+}
+
+function setActiveTeam(team){
+  if (state.stealMode || gameOver() || state.roundOver) return;
+  if (state.activeTeam === team) return;
+  snapshot();
+  state.activeTeam = team;
+  render();
+}
+function switchActiveTeam(){
+  setActiveTeam(state.activeTeam === 'A' ? 'B' : 'A');
+}
+
+function resetGame(){
+  if (!confirm('Reset the entire game? This clears both scores and returns to round 1.')) return;
+  history = [];
+  state = {
+    roundIndex: 0,
+    revealed: [false,false,false,false,false,false,false,false],
+    pot: 0,
+    activeTeam: 'A',
+    stealMode: false,
+    roundOver: false,
+    winningTeam: null,
+    view: state.view,
+    teams: {
+      A: { name: document.getElementById('teamNameA').value || 'Team A', score: 0, strikes: 0 },
+      B: { name: document.getElementById('teamNameB').value || 'Team B', score: 0, strikes: 0 }
+    }
+  };
+  render();
+}
+
+function toggleView(){
+  state.view = state.view === 'board' ? 'scoreboard' : 'board';
+  render();
+}
+
+/* ========================= RENDER ========================= */
+const tileGrid = document.getElementById('tileGrid');
+
+function buildTiles(){
+  tileGrid.innerHTML = '';
+  const answers = gameOver() ? [] : currentRound().answers;
+  answers.forEach((a, i) => {
+    const tile = document.createElement('div');
+    tile.className = 'tile';
+    tile.dataset.i = i;
+    tile.innerHTML = `
+      <div class="tile-inner">
+        <div class="tile-face tile-front">
+          <div class="tile-num">${i+1}</div>
+        </div>
+        <div class="tile-face tile-back">
+          <span class="tile-answer-text">${a.text}</span>
+          <span class="tile-points">${a.points}</span>
+        </div>
+      </div>`;
+    tile.addEventListener('click', () => revealTile(i));
+    tileGrid.appendChild(tile);
+  });
+}
+
+function render(){
+  // View switching
+  document.getElementById('boardView').hidden = state.view !== 'board';
+  document.getElementById('scoreboardView').hidden = state.view !== 'scoreboard';
+  document.getElementById('viewToggleBtn').textContent = state.view === 'board' ? 'Scoreboard ▸ (S)' : '';
+  document.getElementById('viewToggleBtn').hidden = state.view !== 'board';
+
+  // Game over check
+  if (gameOver()){
+    document.getElementById('questionText').textContent = 'Game complete!';
+    document.getElementById('roundLabel').textContent = `Final results`;
+    tileGrid.innerHTML = '';
+    document.getElementById('nextRoundBtn').disabled = true;
+  } else {
+    // Rebuild tiles only if grid is empty or round changed
+    if (tileGrid.children.length !== currentRound().answers.length){
+      buildTiles();
+    }
+    document.getElementById('questionText').textContent = currentRound().question;
+    document.getElementById('roundLabel').textContent = `Round ${state.roundIndex+1} of ${rounds.length}`;
+    document.getElementById('nextRoundBtn').disabled = !state.roundOver;
+
+    // Tile reveal state
+    Array.from(tileGrid.children).forEach((tile, i) => {
+      tile.classList.toggle('revealed', state.revealed[i]);
+      tile.classList.toggle('locked', state.roundOver);
+    });
+  }
+
+  // Strikes (show the active team's strikes; if stealing, show the team that struck out)
+  const strikeTeam = state.stealMode ? (state.activeTeam === 'A' ? 'B' : 'A') : state.activeTeam;
+  const strikeCount = state.teams[strikeTeam].strikes;
+  document.querySelectorAll('.strike-box').forEach((box, i) => {
+    const isActive = i < strikeCount;
+    box.classList.toggle('active', isActive);
+    box.textContent = isActive ? '✕' : '';
+  });
+
+  document.getElementById('potDisplay').textContent = `Round points: ${state.pot}`;
+
+  const stealBanner = document.getElementById('stealBanner');
+  if (state.stealMode && !state.roundOver){
+    stealBanner.hidden = false;
+    stealBanner.textContent = `STEAL! ${state.teams[state.activeTeam].name} gets one guess`;
+  } else {
+    stealBanner.hidden = true;
+  }
+
+  // Team panels
+  document.getElementById('teamScoreA').textContent = state.teams.A.score;
+  document.getElementById('teamScoreB').textContent = state.teams.B.score;
+  document.getElementById('teamStrikesA').textContent = state.teams.A.strikes;
+  document.getElementById('teamStrikesB').textContent = state.teams.B.strikes;
+  document.getElementById('teamPanelA').classList.toggle('active', state.activeTeam === 'A' && !state.roundOver);
+  document.getElementById('teamPanelB').classList.toggle('active', state.activeTeam === 'B' && !state.roundOver);
+
+  // Keep name inputs in sync (only if not currently focused, to avoid cursor jumps)
+  if (document.activeElement.id !== 'teamNameA') document.getElementById('teamNameA').value = state.teams.A.name;
+  if (document.activeElement.id !== 'teamNameB') document.getElementById('teamNameB').value = state.teams.B.name;
+
+  // Scoreboard view
+  document.getElementById('sbNameA').textContent = state.teams.A.name;
+  document.getElementById('sbNameB').textContent = state.teams.B.name;
+  document.getElementById('sbScoreA').textContent = state.teams.A.score;
+  document.getElementById('sbScoreB').textContent = state.teams.B.score;
+  document.getElementById('scoreboardTitle').textContent = gameOver() ? 'Final score' : 'Scoreboard';
+
+  // Round-over overlay
+  const overlay = document.getElementById('roundOverOverlay');
+  if (state.roundOver && !gameOver()){
+    overlay.hidden = false;
+    document.getElementById('roundOverText').textContent =
+      `${state.teams[state.winningTeam].name} wins the round! +${state.pot} points`;
+  } else {
+    overlay.hidden = true;
+  }
+
+  // Button enable/disable
+  document.getElementById('strikeBtn').disabled = state.roundOver;
+  document.getElementById('switchTeamBtn').disabled = state.stealMode || state.roundOver;
+  document.getElementById('undoBtn').disabled = history.length === 0;
+}
+
+/* ========================= EVENT WIRING ========================= */
+document.getElementById('strikeBtn').addEventListener('click', strike);
+document.getElementById('switchTeamBtn').addEventListener('click', switchActiveTeam);
+document.getElementById('nextRoundBtn').addEventListener('click', nextRound);
+document.getElementById('overlayNextBtn').addEventListener('click', nextRound);
+document.getElementById('undoBtn').addEventListener('click', undo);
+document.getElementById('viewToggleBtn').addEventListener('click', toggleView);
+document.getElementById('backToBoardBtn').addEventListener('click', toggleView);
+document.getElementById('resetGameBtn').addEventListener('click', resetGame);
+
+document.getElementById('teamNameA').addEventListener('input', e => { state.teams.A.name = e.target.value || 'Team A'; render(); });
+document.getElementById('teamNameB').addEventListener('input', e => { state.teams.B.name = e.target.value || 'Team B'; render(); });
+
+document.addEventListener('keydown', (e) => {
+  if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+  const k = e.key.toLowerCase();
+  if (k >= '1' && k <= '8') revealTile(parseInt(k, 10) - 1);
+  else if (k === 'x') strike();
+  else if (k === 'arrowleft') setActiveTeam('A');
+  else if (k === 'arrowright') setActiveTeam('B');
+  else if (k === 'n') nextRound();
+  else if (k === 's') toggleView();
+  else if (k === 'z') undo();
+});
+
+/* ========================= INIT ========================= */
+buildTiles();
+render();
+</script>
+</body>
+</html>
